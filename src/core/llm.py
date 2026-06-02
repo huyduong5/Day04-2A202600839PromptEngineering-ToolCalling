@@ -34,6 +34,25 @@ def build_chat_model(
 ):
     if provider == "google":
         from langchain_google_genai import ChatGoogleGenerativeAI
+        import time
+
+        # Monkeypatch invoke to handle 429 rate limits gracefully
+        if not hasattr(ChatGoogleGenerativeAI, "_original_invoke_patched"):
+            original_invoke = ChatGoogleGenerativeAI.invoke
+            def retrying_invoke(self, *args, **kwargs):
+                for i in range(15):
+                    try:
+                        return original_invoke(self, *args, **kwargs)
+                    except Exception as e:
+                        err_str = str(e).lower()
+                        if "429" in err_str or "resource_exhausted" in err_str:
+                            print(f"\n[Warning] Rate limit 429. Waiting 65s for full quota recovery (retry {i+1}/15)...")
+                            time.sleep(65)
+                        else:
+                            raise e
+                return original_invoke(self, *args, **kwargs)
+            ChatGoogleGenerativeAI.invoke = retrying_invoke
+            ChatGoogleGenerativeAI._original_invoke_patched = True
 
         return ChatGoogleGenerativeAI(
             model=model_name or os.getenv("TRAVEL_AGENT_MODEL", "gemini-2.5-flash-lite"),

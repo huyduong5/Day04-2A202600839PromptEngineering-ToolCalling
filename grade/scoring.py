@@ -137,6 +137,7 @@ def main() -> int:
     if not hasattr(module, "run_agent"):
         raise SystemExit(f"Module {args.module} does not expose run_agent()")
 
+    import time
     cases = load_cases(Path(args.cases))
     scores = []
     for case in cases:
@@ -155,6 +156,8 @@ def main() -> int:
                 judge_model_name=args.judge_model_name,
             )
         )
+        # Sleep for 12 seconds between cases to avoid Gemini API Rate Limit (429) on Free Tier
+        time.sleep(12)
 
     summary = summarize_scores(scores)
     print(json.dumps(summary, indent=2, ensure_ascii=False))
